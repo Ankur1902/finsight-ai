@@ -1,0 +1,190 @@
+[
+  {
+    "id": "msft_cfo_fy25_q1",
+    "question": "Who is Microsoft's CFO on the FY25 Q1 earnings conference call?",
+    "expected_company": "microsoft",
+    "expected_quarter": "Q1",
+    "expected_year": "2025",
+    "expected_keywords": ["amy", "hood", "chief financial"],
+    "expected_answer_terms": ["amy hood"]
+  },
+  {
+    "id": "msft_call_date_fy25_q1",
+    "question": "When was Microsoft's FY25 first quarter earnings conference call held?",
+    "expected_company": "microsoft",
+    "expected_quarter": "Q1",
+    "expected_year": "2025",
+    "expected_keywords": ["october", "30", "2024"],
+    "expected_answer_terms": ["october 30, 2024", "october 30 2024"]
+  },
+  {
+    "id": "msft_revenue_fy25_q1",
+    "question": "What was Microsoft's revenue for FY25 Q1?",
+    "expected_company": "microsoft",
+    "expected_quarter": "Q1",
+    "expected_year": "2025",
+    "expected_keywords": ["65.6", "billion", "revenue"],
+    "expected_answer_terms": ["65.6 billion", "$65.6 billion"]
+  },
+  {
+    "id": "msft_azure_growth_fy25_q1",
+    "question": "What was Azure's year-over-year revenue growth percentage in FY25 Q1?",
+    "expected_company": "microsoft",
+    "expected_quarter": "Q1",
+    "expected_year": "2025",
+    "expected_keywords": ["azure", "33", "growth"],
+    "expected_answer_terms": ["33%", "33 percent"]
+  },
+  {
+    "id": "msft_net_income_fy25_q1",
+    "question": "What was Microsoft's net income for FY25 Q1?",
+    "expected_company": "microsoft",
+    "expected_quarter": "Q1",
+    "expected_year": "2025",
+    "expected_keywords": ["24.7", "billion", "net income"],
+    "expected_answer_terms": ["24.7 billion", "$24.7 billion"]
+  },
+  {
+    "id": "meta_ceo_q3_2024",
+    "question": "Who is Meta's CEO mentioned in the Q3 2024 earnings call?",
+    "expected_company": "meta",
+    "expected_quarter": "Q3",
+    "expected_year": "2024",
+    "expected_keywords": ["mark", "zuckerberg", "chief executive"],
+    "expected_answer_terms": ["mark zuckerberg"]
+  },
+  {
+    "id": "meta_revenue_q3_2024",
+    "question": "What was Meta's revenue for Q3 2024?",
+    "expected_company": "meta",
+    "expected_quarter": "Q3",
+    "expected_year": "2024",
+    "expected_keywords": ["40.5", "billion", "revenue"],
+    "expected_answer_terms": ["40.5 billion", "$40.5 billion"]
+  },
+  {
+    "id": "meta_capex_2024",
+    "question": "What is Meta's 2024 CapEx guidance as stated in Q3 2024?",
+    "expected_company": "meta",
+    "expected_quarter": "Q3",
+    "expected_year": "2024",
+    "expected_keywords": ["capex", "2024", "guidance"],
+    "expected_answer_terms": ["35 billion", "$35 billion"]
+  },
+  {
+    "id": "meta_daily_users_q3_2024",
+    "question": "How many daily users did Meta report for Q3 2024?",
+    "expected_company": "meta",
+    "expected_quarter": "Q3",
+    "expected_year": "2024",
+    "expected_keywords": ["3.29", "billion", "daily users"],
+    "expected_answer_terms": ["3.29 billion", "3.29 billion daily users"]
+  },
+  {
+    "id": "nvda_ceo_q1_2026",
+    "question": "Who is NVIDIA's CEO on the Q1 fiscal 2026 earnings call?",
+    "expected_company": "nvidia",
+    "expected_quarter": "Q1",
+    "expected_year": "2026",
+    "expected_keywords": ["jensen", "huang", "chief executive"],
+    "expected_answer_terms": ["jensen huang"]
+  },
+  {
+    "id": "nvda_call_date_q1_2026",
+    "question": "When was NVIDIA's Q1 fiscal 2026 earnings conference call held?",
+    "expected_company": "nvidia",
+    "expected_quarter": "Q1",
+    "expected_year": "2026",
+    "expected_keywords": ["may", "28", "2025"],
+    "expected_answer_terms": ["may 28, 2025", "may 28 2025"]
+  },
+  {
+    "id": "nvda_revenue_q1_2026",
+    "question": "What was NVIDIA's revenue for Q1 fiscal 2026?",
+    "expected_company": "nvidia",
+    "expected_quarter": "Q1",
+    "expected_year": "2026",
+    "expected_keywords": ["26.0", "billion", "revenue"],
+    "expected_answer_terms": ["26.0 billion", "$26.0 billion"]
+  },
+  {
+    "id": "nvda_datacenter_growth_q1_2026",
+    "question": "What was NVIDIA's Data Center segment revenue growth year-over-year in Q1 fiscal 2026?",
+    "expected_company": "nvidia",
+    "expected_quarter": "Q1",
+    "expected_year": "2026",
+    "expected_keywords": ["data center", "100", "growth"],
+    "expected_answer_terms": ["100%", "100 percent"]
+  },
+  {
+    "id": "nvda_guidance_q2_2026",
+    "question": "What is NVIDIA's revenue guidance for Q2 fiscal 2026?",
+    "expected_company": "nvidia",
+    "expected_quarter": "Q1",
+    "expected_year": "2026",
+    "expected_keywords": ["28", "billion", "guidance"],
+    "expected_answer_terms": ["28 billion", "$28 billion"]
+  },
+  {
+    "id": "msft_eps_fy25_q1",
+    "question": "What was Microsoft's EPS for FY25 Q1?",
+    "expected_company": "microsoft",
+    "expected_quarter": "Q1",
+    "expected_year": "2025",
+    "expected_keywords": ["3.30", "eps", "per share"],
+    "expected_answer_terms": ["3.30", "$3.30"]
+  },
+  {
+    "id": "msft_commercial_cloud_fy25_q1",
+    "question": "What was Microsoft's commercial cloud revenue growth in FY25 Q1?",
+    "expected_company": "microsoft",
+    "expected_quarter": "Q1",
+    "expected_year": "2025",
+    "expected_keywords": ["commercial cloud", "22", "growth"],
+    "expected_answer_terms": ["22%", "22 percent"]
+  },
+  {
+    "id": "meta_ad_revenue_q3_2024",
+    "question": "What percentage of Meta's Q3 2024 revenue came from advertising?",
+    "expected_company": "meta",
+    "expected_quarter": "Q3",
+    "expected_year": "2024",
+    "expected_keywords": ["advertising", "percentage", "revenue"],
+    "expected_answer_terms": ["97%", "97 percent"]
+  },
+  {
+    "id": "nvda_h100_chips_q1_2026",
+    "question": "How many NVIDIA H100 chips were shipped in Q1 fiscal 2026?",
+    "expected_company": "nvidia",
+    "expected_quarter": "Q1",
+    "expected_year": "2026",
+    "expected_keywords": ["h100", "chips", "shipped"],
+    "expected_answer_terms": ["1 million", "one million"]
+  },
+  {
+    "id": "msft_copilot_customers_fy25_q1",
+    "question": "How many enterprise customers adopted Microsoft Copilot in FY25 Q1?",
+    "expected_company": "microsoft",
+    "expected_quarter": "Q1",
+    "expected_year": "2025",
+    "expected_keywords": ["copilot", "enterprise", "customers"],
+    "expected_answer_terms": ["18000", "18000 customers"]
+  },
+  {
+    "id": "meta_capex_q4_2024",
+    "question": "What is Meta's 2026 CapEx guidance mentioned in Q4 2024?",
+    "expected_company": "meta",
+    "expected_quarter": "Q4",
+    "expected_year": "2024",
+    "expected_keywords": ["capex", "2026", "guidance"],
+    "expected_answer_terms": ["50 billion", "$50 billion"]
+  },
+  {
+    "id": "out_of_scope",
+    "question": "What was Apple's iPhone revenue in Q3 2025?",
+    "expected_company": null,
+    "expected_keywords": [],
+    "expected_answer_terms": [],
+    "should_refuse": true
+  }
+]
