@@ -1,0 +1,147 @@
+import type { Metrics } from "../../lib/types";
+import { downloadJson } from "../../lib/api";
+import { formatFact, METRIC_LABELS, periodLabel } from "../../lib/finance";
+import EvidenceExcerpt from "./evidence";
+import { MetricTrends } from "./financial-charts";
+
+export default function FinancialDashboard({
+  metrics,
+  history,
+  loadingHistory,
+  onLoadHistory,
+}: {
+  metrics: Metrics | null;
+  history: Metrics[];
+  loadingHistory: boolean;
+  onLoadHistory: () => void;
+}) {
+  if (!metrics)
+    return (
+      <section className="empty">
+        <div className="empty-icon">▥</div>
+        <h2>Turn earnings calls into clear numbers</h2>
+        <p>
+          Select a company and fiscal period to extract reported financial
+          results with their transcript evidence.
+        </p>
+      </section>
+    );
+  const available = new Set(metrics.facts.map((fact) => fact.metric)).size;
+  return (
+    <section aria-label="Financial metric dashboard results">
+      <div className="section-heading">
+        <h2>{periodLabel(metrics.period)} results</h2>
+        <button
+          className="secondary"
+          type="button"
+          onClick={() =>
+            downloadJson(
+              metrics,
+              `${metrics.company}-${metrics.period}-metrics.json`,
+            )
+          }
+        >
+          Export evidence JSON ↓
+        </button>
+      </div>
+      <p className="notice">{metrics.notice}</p>
+      <div className="analysis-stats">
+        <div>
+          <span>Metrics with evidence</span>
+          <strong>
+            {available}
+            <small> / {Object.keys(METRIC_LABELS).length}</small>
+          </strong>
+        </div>
+        <div>
+          <span>Conflicting groups</span>
+          <strong>{metrics.conflicts.length}</strong>
+        </div>
+        <div>
+          <span>Extraction issues</span>
+          <strong>{metrics.failed_extractions + metrics.rejected_facts}</strong>
+        </div>
+      </div>
+      <div className="metric-grid">
+        {Object.entries(METRIC_LABELS).map(([key, label]) => {
+          const facts = metrics.facts.filter((fact) => fact.metric === key);
+          const conflicting = metrics.conflicts.some((group) =>
+            group.some((fact) => fact.metric === key),
+          );
+          return (
+            <article className="metric-card" key={key}>
+              <p className="eyebrow">{label}</p>
+              {facts.length ? (
+                facts.map((fact) => (
+                  <div key={`${fact.metric}-${fact.basis}-${fact.unit}`}>
+                    <div className="metric-value">{formatFact(fact)}</div>
+                    <span className="muted">
+                      {fact.basis} · {fact.scope}
+                    </span>
+                    <EvidenceExcerpt evidence={fact.evidence} />
+                  </div>
+                ))
+              ) : (
+                <>
+                  <div className="metric-value muted">—</div>
+                  <p className="muted">
+                    {conflicting
+                      ? "Conflicting figures withheld"
+                      : "No unambiguous reported figure"}
+                  </p>
+                </>
+              )}
+            </article>
+          );
+        })}
+      </div>
+      {(metrics.failed_extractions > 0 || metrics.rejected_facts > 0) && (
+        <p className="notice">
+          {metrics.failed_extractions} extraction responses could not be parsed;{" "}
+          {metrics.rejected_facts} proposed facts failed validation. Missing
+          figures are left blank.
+        </p>
+      )}
+      {metrics.conflicts.length > 0 && (
+        <details className="conflicts">
+          <summary>
+            Review {metrics.conflicts.length} conflicting metric groups
+          </summary>
+          {metrics.conflicts.flat().map((fact, index) => (
+            <div key={index}>
+              <strong>
+                {METRIC_LABELS[fact.metric]} · {formatFact(fact)} · {fact.basis}
+              </strong>
+              <EvidenceExcerpt evidence={fact.evidence} />
+            </div>
+          ))}
+        </details>
+      )}
+      <div className="section-heading">
+        <h2>Fiscal-quarter trends</h2>
+        <button
+          type="button"
+          className="secondary"
+          disabled={loadingHistory}
+          onClick={onLoadHistory}
+        >
+          {loadingHistory ? "Loading periods…" : "Load up to 6 periods"}
+        </button>
+      </div>
+      <p className="muted">
+        Select a metric and reporting basis. Gaps remain visible, and every
+        plotted point retains its original evidence.
+      </p>
+      <MetricTrends results={history} />
+      {history.some(
+        (row) => row.failed_extractions || row.conflicts.length,
+      ) && (
+        <p className="notice">
+          Some historical periods have incomplete extraction or conflicting
+          figures. Only accepted observations are plotted.
+        </p>
+      )}
+      <p className="model-note">Generated by {metrics.model}</p>
+    </section>
+  );
+}

@@ -1,1 +1,27 @@
+# Core RAG
+langchain-core>=1.0
+langchain-text-splitters>=1.0
+langchain-chroma>=1.0
+langchain-huggingface>=1.0
+chromadb>=1.0
+sentence-transformers>=5.0
+transformers>=4.50
+torch>=2.3
 rank-bm25>=0.2.2
+pymupdf>=1.24
+tiktoken>=0.7
+
+# App
+streamlit>=1.40
+fastapi>=0.115,<1
+uvicorn>=0.30,<1
+pydantic>=2.9,<3
+
+# Optional: Claude as generator and as the RAGAS judge (set ANTHROPIC_API_KEY)
+anthropic>=1.0
+google-genai>=1,<3
+python-dotenv>=1,<2
+
+# Evaluation
+ragas>=0.4
+pytest>=8

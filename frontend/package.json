@@ -1,0 +1,29 @@
+{
+  "name": "finsight-web",
+  "version": "2.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write app lib tests package.json tsconfig.json",
+    "format:check": "prettier --check app lib tests package.json tsconfig.json",
+    "test": "node --test tests/*.test.cjs"
+  },
+  "dependencies": {
+    "next": "^16.0.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "undici": "^7.30.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "prettier": "^3.9.9",
+    "typescript": "^5.9.0"
+  }
+}

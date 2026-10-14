@@ -1,291 +1,249 @@
+"""Deterministic (no-LLM-judge) evaluation of retrieval, generation and guardrails."""
+
 from __future__ import annotations
 
 import re
-import time
+import statistics
 from dataclasses import asdict, dataclass, field
-from typing import Any
+from typing import Any, Callable
 
+from src.guardrails import REFUSAL_TEXT
 
-REFUSAL_PHRASE = "couldn't find that information in the provided documents"
+COMPANY_ALIASES = {"nvidia": "nvda", "nvda": "nvda", "meta": "meta", "microsoft": "microsoft", "msft": "microsoft"}
+ANSWERABLE = {"factoid", "comparison"}
 
 
 def _normalize(text: str) -> str:
     return re.sub(r"\s+", " ", text.lower()).strip()
 
 
-COMPANY_ALIASES = {
-    "nvidia": "nvda",
-    "nvda": "nvda",
-    "meta": "meta",
-    "microsoft": "microsoft",
-}
+def _company(name: str | None) -> str | None:
+    return COMPANY_ALIASES.get((name or "").lower(), name)
 
 
-def _normalize_company(name: str) -> str:
-    key = name.lower()
-    return COMPANY_ALIASES.get(key, key)
+def expected_targets(case: dict[str, Any]) -> list[tuple[str | None, str | None, str | None]]:
+    if case.get("expected_targets"):
+        return [(_company(c), q, y) for c, q, y in case["expected_targets"]]
+    if case.get("expected_company") or case.get("expected_quarter") or case.get("expected_year"):
+        return [(_company(case.get("expected_company")), case.get("expected_quarter"), case.get("expected_year"))]
+    return []
 
 
-def _chunk_matches_company(chunk_meta: dict[str, Any], company: str | None) -> bool:
-    if not company:
+def _matches(meta: dict[str, Any], target: tuple) -> bool:
+    company, quarter, year = target
+    if company and _company(meta.get("company")) != company:
         return False
-    return _normalize_company(chunk_meta.get("company", "")) == _normalize_company(
-        company
-    )
-
-
-def _chunk_matches_period(
-    chunk_meta: dict[str, Any],
-    quarter: str | None,
-    year: str | None,
-) -> bool:
-    if quarter and chunk_meta.get("quarter", "").upper() != quarter.upper():
+    if quarter and str(meta.get("quarter", "")).upper() != quarter.upper():
         return False
-    if year and str(chunk_meta.get("year", "")) != str(year):
+    if year and str(meta.get("year", "")) != str(year):
         return False
     return True
 
 
-def _is_relevant_chunk(
-    chunk_meta: dict[str, Any],
-    case: dict[str, Any],
-) -> bool:
-    company = case.get("expected_company")
-    if company and not _chunk_matches_company(chunk_meta, company):
-        return False
+def relevance_flags(metas: list[dict], case: dict) -> list[bool]:
+    targets = expected_targets(case)
+    return [any(_matches(m, t) for t in targets) for m in metas] if targets else []
 
-    quarter = case.get("expected_quarter")
-    year = case.get("expected_year")
-    if (quarter or year) and not _chunk_matches_period(chunk_meta, quarter, year):
-        return False
 
-    return bool(company or quarter or year)
+def target_coverage(metas: list[dict], case: dict) -> float | None:
+    targets = expected_targets(case)
+    if not targets:
+        return None
+    return sum(any(_matches(m, t) for m in metas) for t in targets) / len(targets)
 
 
 def keyword_recall(text: str, keywords: list[str]) -> float | None:
     if not keywords:
         return None
     normalized = _normalize(text)
-    hits = sum(1 for kw in keywords if kw.lower() in normalized)
-    return hits / len(keywords)
+    return sum(kw.lower() in normalized for kw in keywords) / len(keywords)
 
 
-def hit_at_k(relevant_flags: list[bool]) -> float:
-    return 1.0 if any(relevant_flags) else 0.0
+def hit_at_k(flags: list[bool]) -> float:
+    return 1.0 if any(flags) else 0.0
 
 
-def mrr(relevant_flags: list[bool]) -> float:
-    for idx, is_relevant in enumerate(relevant_flags, start=1):
-        if is_relevant:
-            return 1.0 / idx
-    return 0.0
+def mrr(flags: list[bool]) -> float:
+    return next((1.0 / i for i, f in enumerate(flags, start=1) if f), 0.0)
 
 
-def precision_at_k(relevant_flags: list[bool]) -> float:
-    if not relevant_flags:
-        return 0.0
-    return sum(relevant_flags) / len(relevant_flags)
+def precision_at_k(flags: list[bool]) -> float:
+    return sum(flags) / len(flags) if flags else 0.0
 
 
-def answer_term_match(answer: str, terms: list[str]) -> float:
+def answer_term_match(answer: str, terms: list[str], require_all: bool) -> float | None:
     if not terms:
-        return 1.0
+        return None
     normalized = _normalize(answer)
-    return 1.0 if any(_normalize(term) in normalized for term in terms) else 0.0
+    hits = [_normalize(t) in normalized for t in terms]
+    return float(all(hits)) if require_all else float(any(hits))
 
 
-def refused_to_answer(answer: str) -> bool:
-    return REFUSAL_PHRASE in _normalize(answer)
+def refused(answer: str, blocked: bool) -> bool:
+    return blocked or _normalize(REFUSAL_TEXT).rstrip(".") in _normalize(answer)
+
+
+def _mean(values: list[float | None]) -> float | None:
+    vals = [v for v in values if v is not None]
+    return sum(vals) / len(vals) if vals else None
+
+
+def _pct(values: list[float], q: float) -> float | None:
+    if not values:
+        return None
+    values = sorted(values)
+    return values[min(len(values) - 1, int(round(q * (len(values) - 1))))]
 
 
 @dataclass
 class CaseResult:
     id: str
+    category: str
     question: str
-    hit_at_k: float
-    mrr: float
-    precision_at_k: float
-    keyword_recall_at_k: float | None
+    hit_at_k: float | None = None
+    mrr: float | None = None
+    precision_at_k: float | None = None
+    target_coverage: float | None = None
+    keyword_recall_at_k: float | None = None
     retrieved_sources: list[str] = field(default_factory=list)
     answer_term_match: float | None = None
-    refused: bool | None = None
+    refusal_correct: float | None = None
+    flag_correct: float | None = None
+    citation_count: int | None = None
+    numeric_grounding: float | None = None
+    flags: list[str] = field(default_factory=list)
     latency_ms: float | None = None
-    answer_preview: str | None = None
+    answer: str | None = None
+    contexts: list[str] = field(default_factory=list)
 
 
 @dataclass
 class EvalReport:
     mode: str
     num_cases: int
-    hit_rate_at_k: float
-    mean_reciprocal_rank: float
-    mean_precision_at_k: float
-    mean_keyword_recall_at_k: float | None = None
-    mean_answer_term_match: float | None = None
-    refusal_accuracy: float | None = None
-    mean_latency_ms: float | None = None
+    summary: dict[str, float | None]
     cases: list[CaseResult] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
-        payload = asdict(self)
-        payload["cases"] = [asdict(case) for case in self.cases]
-        return payload
+        return {"mode": self.mode, "num_cases": self.num_cases, "summary": self.summary,
+                "cases": [asdict(c) for c in self.cases]}
+
+
+def _score_retrieval(result: CaseResult, metas: list[dict], contexts: list[str], case: dict) -> None:
+    flags = relevance_flags(metas, case)
+    if flags:
+        result.hit_at_k = hit_at_k(flags)
+        result.mrr = mrr(flags)
+        result.precision_at_k = precision_at_k(flags)
+        result.target_coverage = target_coverage(metas, case)
+    result.keyword_recall_at_k = keyword_recall("\n".join(contexts), case.get("expected_keywords", []))
+    result.retrieved_sources = [f"{m.get('source')}#p{m.get('page')}" for m in metas]
 
 
 def evaluate_retrieval(retriever, cases: list[dict[str, Any]]) -> EvalReport:
-    case_results: list[CaseResult] = []
-
+    results = []
     for case in cases:
-        docs = retriever.invoke(case["question"])
-        relevant_flags = [
-            _is_relevant_chunk(doc.metadata, case) for doc in docs
-        ]
+        category = case.get("category", "factoid")
+        result = CaseResult(case["id"], category, case["question"])
+        if category in ANSWERABLE:
+            docs = retriever.retrieve(case["question"])
+            _score_retrieval(result, [d.metadata for d in docs], [d.page_content for d in docs], case)
+        results.append(result)
 
-        context = "\n\n".join(doc.page_content for doc in docs)
-        keywords = case.get("expected_keywords", [])
-
-        case_results.append(
-            CaseResult(
-                id=case["id"],
-                question=case["question"],
-                hit_at_k=hit_at_k(relevant_flags),
-                mrr=mrr(relevant_flags),
-                precision_at_k=precision_at_k(relevant_flags),
-                keyword_recall_at_k=keyword_recall(context, keywords),
-                retrieved_sources=[
-                    doc.metadata.get("source", "unknown") for doc in docs
-                ],
-            )
-        )
-
-    n = len(case_results)
+    scored = [r for r in results if r.hit_at_k is not None]
     return EvalReport(
         mode="retrieval",
-        num_cases=n,
-        hit_rate_at_k=sum(c.hit_at_k for c in case_results) / n,
-        mean_reciprocal_rank=sum(c.mrr for c in case_results) / n,
-        mean_precision_at_k=sum(c.precision_at_k for c in case_results) / n,
-        mean_keyword_recall_at_k=(
-            sum(c.keyword_recall_at_k for c in case_results if c.keyword_recall_at_k is not None)
-            / max(1, sum(1 for c in case_results if c.keyword_recall_at_k is not None))
-        ),
-        cases=case_results,
+        num_cases=len(scored),
+        summary={
+            "hit_at_k": _mean([r.hit_at_k for r in scored]),
+            "mrr": _mean([r.mrr for r in scored]),
+            "precision_at_k": _mean([r.precision_at_k for r in scored]),
+            "target_coverage": _mean([r.target_coverage for r in scored]),
+            "keyword_recall_at_k": _mean([r.keyword_recall_at_k for r in scored]),
+        },
+        cases=results,
     )
 
 
-def evaluate_rag(ask_fn, cases: list[dict[str, Any]]) -> EvalReport:
-    case_results: list[CaseResult] = []
-    refusal_cases = [c for c in cases if c.get("should_refuse")]
-
+def evaluate_rag(answer_fn: Callable, cases: list[dict[str, Any]]) -> EvalReport:
+    """answer_fn(question) -> RAGResponse (see src.rag.answer_question)."""
+    results = []
     for case in cases:
-        start = time.perf_counter()
-        answer, sources = ask_fn(case["question"])
-        latency_ms = (time.perf_counter() - start) * 1000
+        category = case.get("category", "factoid")
+        resp = answer_fn(case["question"])
+        result = CaseResult(case["id"], category, case["question"])
+        result.answer = resp.answer
+        result.contexts = resp.contexts
+        result.flags = resp.flags
+        result.latency_ms = resp.timings_ms.get("total")
 
-        answer_str = answer if isinstance(answer, str) else str(answer)
-        docs_meta = [{"source": s.get("source", "")} for s in sources]
-        relevant_flags = [
-            _is_relevant_chunk(meta, case) for meta in docs_meta
-        ]
+        if category in ANSWERABLE:
+            _score_retrieval(result, resp.sources, resp.contexts, case)
 
-        refused = refused_to_answer(answer_str)
-        should_refuse = case.get("should_refuse", False)
+        did_refuse = refused(resp.answer, resp.blocked)
+        result.refusal_correct = float(did_refuse == bool(case.get("should_refuse")))
 
-        case_results.append(
-            CaseResult(
-                id=case["id"],
-                question=case["question"],
-                hit_at_k=hit_at_k(relevant_flags),
-                mrr=mrr(relevant_flags),
-                precision_at_k=precision_at_k(relevant_flags),
-                keyword_recall_at_k=keyword_recall(
-                    answer_str,
-                    case.get("expected_answer_terms", []),
-                )
-                if not should_refuse
-                else (1.0 if refused else 0.0),
-                retrieved_sources=[s.get("source", "unknown") for s in sources],
-                answer_term_match=answer_term_match(
-                    answer_str,
-                    case.get("expected_answer_terms", []),
-                ),
-                refused=refused,
-                latency_ms=latency_ms,
-                answer_preview=answer_str[:160],
+        if not case.get("should_refuse"):
+            result.answer_term_match = answer_term_match(
+                resp.answer, case.get("expected_answer_terms", []), require_all=category == "comparison"
             )
-        )
+            if not did_refuse:
+                result.citation_count = resp.details.get("citation_count")
+                result.numeric_grounding = resp.details.get("numeric_grounding")
 
-    n = len(case_results)
-    refusal_accuracy = None
-    if refusal_cases:
-        refused_scores = [
-            c.keyword_recall_at_k
-            for c in case_results
-            if any(rc["id"] == c.id for rc in refusal_cases)
-        ]
-        refusal_accuracy = sum(refused_scores) / len(refused_scores)
+        if case.get("expected_flag"):
+            result.flag_correct = float(case["expected_flag"] in resp.flags)
 
-    answer_term_scores = [
-        c.answer_term_match
-        for c in case_results
-        if c.answer_term_match is not None
-        and not any(ac["id"] == c.id for ac in refusal_cases)
-    ]
+        results.append(result)
+
+    answerable = [r for r in results if r.category in ANSWERABLE]
+    unanswerable = [r for r, c in zip(results, cases) if c.get("should_refuse")]
+    latencies = [r.latency_ms for r in results if r.latency_ms]
+    generated = [r for r in answerable if r.citation_count is not None]
 
     return EvalReport(
         mode="rag",
-        num_cases=n,
-        hit_rate_at_k=sum(c.hit_at_k for c in case_results) / n,
-        mean_reciprocal_rank=sum(c.mrr for c in case_results) / n,
-        mean_precision_at_k=sum(c.precision_at_k for c in case_results) / n,
-        mean_keyword_recall_at_k=(
-            sum(c.keyword_recall_at_k for c in case_results if c.keyword_recall_at_k is not None)
-            / max(1, sum(1 for c in case_results if c.keyword_recall_at_k is not None))
-        ),
-        mean_answer_term_match=(
-            sum(answer_term_scores) / len(answer_term_scores)
-            if answer_term_scores
-            else None
-        ),
-        refusal_accuracy=refusal_accuracy,
-        mean_latency_ms=sum(c.latency_ms or 0 for c in case_results) / n,
-        cases=case_results,
+        num_cases=len(results),
+        summary={
+            "hit_at_k": _mean([r.hit_at_k for r in answerable]),
+            "mrr": _mean([r.mrr for r in answerable]),
+            "target_coverage": _mean([r.target_coverage for r in answerable]),
+            "keyword_recall_at_k": _mean([r.keyword_recall_at_k for r in answerable]),
+            "answer_correctness": _mean([r.answer_term_match for r in answerable]),
+            "abstention_accuracy": _mean([r.refusal_correct for r in unanswerable]),
+            "over_refusal_rate": _mean([1 - r.refusal_correct for r in answerable]),
+            "guardrail_flag_accuracy": _mean([r.flag_correct for r in results]),
+            "citation_rate": _mean([float((r.citation_count or 0) > 0) for r in generated]),
+            "numeric_grounding": _mean([r.numeric_grounding for r in generated]),
+            "latency_p50_ms": _pct(latencies, 0.5),
+            "latency_p95_ms": _pct(latencies, 0.95),
+        },
+        cases=results,
     )
 
 
 def format_report(report: EvalReport) -> str:
-    lines = [
-        f"Finsight RAG Evaluation ({report.mode})",
-        "=" * 44,
-        f"Cases evaluated : {report.num_cases}",
-        f"Hit@k           : {report.hit_rate_at_k:.2%}",
-        f"MRR             : {report.mean_reciprocal_rank:.3f}",
-        f"Precision@k     : {report.mean_precision_at_k:.2%}",
-    ]
+    lines = [f"Finsight evaluation ({report.mode})", "=" * 52, f"Cases scored          : {report.num_cases}"]
+    for key, value in report.summary.items():
+        if value is None:
+            continue
+        shown = f"{value:.0f} ms" if key.endswith("_ms") else (f"{value:.3f}" if key == "mrr" else f"{value:.1%}")
+        lines.append(f"{key:<22}: {shown}")
 
-    if report.mean_keyword_recall_at_k is not None:
-        lines.append(
-            f"Keyword recall@k: {report.mean_keyword_recall_at_k:.2%}"
-        )
-
-    if report.mean_answer_term_match is not None:
-        lines.append(
-            f"Answer term match: {report.mean_answer_term_match:.2%}"
-        )
-    if report.refusal_accuracy is not None:
-        lines.append(f"Refusal accuracy : {report.refusal_accuracy:.2%}")
-    if report.mean_latency_ms is not None:
-        lines.append(f"Mean latency     : {report.mean_latency_ms:.0f} ms")
-
-    lines.append("")
-    lines.append("Per-case summary")
-    lines.append("-" * 44)
-    for case in report.cases:
-        kw = "n/a" if case.keyword_recall_at_k is None else f"{case.keyword_recall_at_k:.0%}"
-        lines.append(
-            f"[{case.id}] hit={case.hit_at_k:.0f} "
-            f"kw={kw} "
-            f"sources={', '.join(case.retrieved_sources[:2])}"
-        )
-
+    lines += ["", "Per-case", "-" * 52]
+    for c in report.cases:
+        parts = [f"[{c.id}]"]
+        if c.hit_at_k is not None:
+            parts.append(f"hit={c.hit_at_k:.0f} cov={c.target_coverage:.0%}")
+        if c.keyword_recall_at_k is not None:
+            parts.append(f"kw={c.keyword_recall_at_k:.0%}")
+        if c.answer_term_match is not None:
+            parts.append(f"ans={c.answer_term_match:.0f}")
+        if c.refusal_correct is not None:
+            parts.append(f"refusal_ok={c.refusal_correct:.0f}")
+        if c.flag_correct is not None:
+            parts.append(f"flag_ok={c.flag_correct:.0f}")
+        if c.numeric_grounding is not None:
+            parts.append(f"num_grounded={c.numeric_grounding:.0%}")
+        lines.append(" ".join(parts))
     return "\n".join(lines)

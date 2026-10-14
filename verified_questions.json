@@ -1,0 +1,14 @@
+{
+  "model": "gemini:gemini-3.1-flash-lite",
+  "configuration": "0288b1d14007aef43aaf9a09bdeba498f2e7d08c4dc0c6891d91a74155b39dbf",
+  "checked_at": "2026-10-09T07:19:54.660872+00:00",
+  "notice": "Automated repeated checks against gold references and citations; not a promise of perfect output.",
+  "questions": [
+    {
+      "id": "msft_cloud_fy25_q1",
+      "question": "What was Microsoft Cloud revenue in FY25 Q1 and how much did it grow?",
+      "max_ms": 1178.97,
+      "runs": 3
+    }
+  ]
+}
