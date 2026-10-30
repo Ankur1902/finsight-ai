@@ -10,7 +10,8 @@ from time import monotonic
 from starlette.responses import JSONResponse
 
 # Endpoints that call a paid model or heavy extraction.
-EXPENSIVE_PATHS = {"/chat": (20, 60.0), "/changes": (10, 60.0), "/metrics": (10, 60.0), "/feedback": (30, 60.0)}
+EXPENSIVE_PATHS = {"/chat": (20, 60.0), "/changes": (10, 60.0), "/metrics": (10, 60.0), "/feedback": (30, 60.0),
+                   "/guidance": (10, 60.0)}
 
 
 class SlidingWindowLimiter:

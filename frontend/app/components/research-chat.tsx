@@ -52,6 +52,7 @@ export default function ResearchChat({
 }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
+  const [agentic, setAgentic] = useState(false);
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [failedQuestion, setFailedQuestion] = useState("");
@@ -146,7 +147,7 @@ export default function ResearchChat({
       const history = requestHistory(messages);
       const result = await apiRequest("chat", {
         signal: c.signal,
-        body: { question, history },
+        body: { question, history, agentic },
         decode: parseChatAnswer,
       });
       if (id !== epoch.current || c.signal.aborted) return;
@@ -458,6 +459,15 @@ export default function ResearchChat({
                 }
               }}
             />
+            <label className="agentic-toggle">
+              <input
+                type="checkbox"
+                checked={agentic}
+                disabled={busy}
+                onChange={(event) => setAgentic(event.target.checked)}
+              />{" "}
+              Calculator mode: compute growth and differences exactly
+            </label>
             <div className="composer-bottom">
               <span
                 id="composer-help"
