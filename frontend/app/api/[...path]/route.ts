@@ -131,6 +131,7 @@ async function proxy(
       base.replace(/\/$/, "") + "/",
     );
     url.search = request.nextUrl.search;
+    const forwardedFor = request.headers?.get("x-forwarded-for");
     const upstream = await fetch(url, {
       dispatcher: backendAgent,
       method: request.method,
@@ -140,9 +141,7 @@ async function proxy(
         ...(process.env.FINSIGHT_API_KEY
           ? { "X-API-Key": process.env.FINSIGHT_API_KEY }
           : {}),
-        ...(request.headers.get("x-forwarded-for")
-          ? { "X-Forwarded-For": request.headers.get("x-forwarded-for")! }
-          : {}),
+        ...(forwardedFor ? { "X-Forwarded-For": forwardedFor } : {}),
       },
       body: body === undefined ? undefined : Buffer.from(body),
       cache: "no-store",
