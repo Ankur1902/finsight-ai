@@ -84,6 +84,74 @@ export type ChatAnswer = {
     inherited: boolean;
   } | null;
   timings_ms: Record<string, number>;
+  claims?: Claim[];
+  claim_summary?: ClaimSummary | null;
+  calculations?: Calculation[];
+  route?: string | null;
+};
+export type Claim = {
+  text: string;
+  citations: number[];
+  status: "supported" | "partial" | "unsupported" | "uncited";
+  support: number;
+  ungrounded_numbers: string[];
+};
+export type ClaimSummary = {
+  total: number;
+  supported: number;
+  partial: number;
+  unsupported: number;
+  uncited: number;
+  support_rate: number;
+};
+export type Calculation = {
+  op: string;
+  label: string;
+  result: string;
+  text: string;
+  sources: number[];
+};
+export type GuidanceRow = {
+  metric: string;
+  low: string;
+  high: string;
+  unit: string;
+  quote: string;
+  page: number;
+  source: string;
+  period: string;
+  horizon: string;
+  verdict: "beat" | "in_line" | "miss" | "no_actual" | "not_comparable";
+  surprise_vs_midpoint_pct?: string | null;
+  actual: {
+    value: string;
+    unit: string;
+    quote: string;
+    page: number;
+    source: string;
+  } | null;
+};
+export type GuidanceReport = {
+  company: string;
+  guided_in: string;
+  reported_in: string | null;
+  guidance: GuidanceRow[];
+  notice: string;
+};
+export type StageStat = { count: number; p50_ms: number; p95_ms: number };
+export type RouteStat = {
+  requests: number;
+  tokens_in: number;
+  tokens_out: number;
+  cost_usd: number;
+  cost_per_request_usd: number;
+  cost_per_correct_answer_usd: number | null;
+};
+export type OpsSummary = {
+  stages: Record<string, StageStat>;
+  routes: Record<string, RouteStat>;
+  counters: Record<string, number>;
+  semantic_cache: { hits: number; misses: number };
 };
 export type ChatMessage = {
   id: string;

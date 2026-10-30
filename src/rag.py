@@ -22,6 +22,9 @@ from .answer_cache import ANSWERS
 from .config import MAX_NEW_TOKENS, GEMINI_THINKING_LEVEL
 from .prompts import SYSTEM_PROMPT, build_user_prompt
 from .query_planner import QueryPlan, plan_query
+from .observability import METRICS, estimate_tokens, span
+from .semantic_cache import SEMANTIC
+from . import agent, claims as claim_checks
 
 TRACE_FILE = Path(os.getenv("FINSIGHT_TRACE_FILE", str(ROOT_DIR / "logs" / "traces.jsonl")))
 COMPANY_LABELS = {"meta": "Meta", "microsoft": "Microsoft", "nvda": "NVIDIA"}
@@ -121,6 +124,7 @@ def answer_question(
     retriever: HybridRetriever | None = None,
     generate: bool = True,
     use_cache: bool = True,
+    tools: bool = False,
 ) -> RAGResponse:
     t0 = time.perf_counter()
     timings: dict[str, float] = {}
@@ -150,7 +154,8 @@ def answer_question(
         resp.flags.append("period_partially_covered")
 
     t = time.perf_counter()
-    docs = retriever.retrieve(_retrieval_query(question, plan), plan)
+    with span("retrieve"):
+        docs = retriever.retrieve(_retrieval_query(question, plan), plan)
     docs, poisoned = guardrails.filter_poisoned_chunks(docs)
     timings["retrieve"] = (time.perf_counter() - t) * 1000
     if poisoned:
@@ -178,7 +183,27 @@ def answer_question(
     # 4. Generate -----------------------------------------------------------
     llm = get_llm()
     resp.details["model"] = llm.name
+    semantic_scope = None
+    if use_cache and os.getenv("FINSIGHT_SEMANTIC_CACHE") == "1" and not history:
+        semantic_scope = json.dumps([llm.name, tools, hashlib.sha256(SYSTEM_PROMPT.encode()).hexdigest(),
+                                     [t.label() for t in plan.targets]])
+        sem_hit = SEMANTIC.get(semantic_scope, question)
+        if sem_hit is not None:
+            METRICS.inc("semantic_cache_hit")
+            sem_hit.details["cached"] = True
+            sem_hit.timings_ms = {**timings, "total": (time.perf_counter() - t0) * 1000}
+            _trace(sem_hit, llm.name)
+            return sem_hit
+    calcs, calc_rejected = [], []
+    if tools:
+        with span("calculate"):
+            calcs, calc_rejected = agent.plan_and_compute(llm, question, docs)
+        resp.details["calculations"] = calcs
+        if calc_rejected:
+            resp.details["calculations_rejected"] = len(calc_rejected)
     prompt = build_user_prompt(question, docs, _history_text(history))
+    if calcs:
+        prompt = agent.calculation_block(calcs) + "\n\n" + prompt
     cache_key = hashlib.sha256(json.dumps([llm.name, MAX_NEW_TOKENS,
         GEMINI_THINKING_LEVEL, SYSTEM_PROMPT, prompt], sort_keys=True).encode()).hexdigest()
     hit = ANSWERS.get(cache_key) if use_cache else None
@@ -188,23 +213,42 @@ def answer_question(
         _trace(hit, llm.name)
         return hit
     t = time.perf_counter()
-    raw = llm.generate(SYSTEM_PROMPT, prompt)
+    with span("generate"):
+        raw = llm.generate(SYSTEM_PROMPT, prompt)
     timings["generate"] = (time.perf_counter() - t) * 1000
+    route = getattr(llm, "last_route", None) or "single"
+    used_model = getattr(llm, "last_model", None) or llm.name
+    resp.details["model"], resp.details["route"] = used_model, route
+    METRICS.record_request(route=route, model=used_model, tokens_in=estimate_tokens(SYSTEM_PROMPT + prompt),
+                           tokens_out=estimate_tokens(raw))
 
     # 5. Output guardrails ---------------------------------------------------
     advice = "investment_advice_request" in resp.flags
-    gout = guardrails.check_output(raw, docs, advice_requested=advice)
+    with span("guard_output"):
+        gout = guardrails.check_output(raw, docs, advice_requested=advice,
+                                       extra_numbers=agent.calculation_numbers(calcs) if calcs else None)
     resp.answer = gout.text
     resp.blocked = not gout.allowed
     resp.flags += gout.flags
     resp.details.update(gout.details)
     if missing:
         resp.answer += "\n\n_Note:_\n" + "\n".join(missing)
+    if not resp.blocked:
+        with span("verify_claims"):
+            verified = claim_checks.verify_claims(
+                resp.answer, docs, extra_numbers=agent.calculation_numbers(calcs) if calcs else None)
+        resp.details["claims"] = claim_checks.claims_as_dicts(verified)
+        resp.details["claim_summary"] = claim_checks.summarize(verified)
+        if resp.details["claim_summary"]["unsupported"]:
+            resp.flags.append("unsupported_claims")
+            METRICS.inc("unsupported_claims")
 
     timings["total"] = (time.perf_counter() - t0) * 1000
     resp.timings_ms = timings
     if use_cache:
         ANSWERS.put(cache_key, resp)
+        if semantic_scope:
+            SEMANTIC.put(semantic_scope, question, resp)
     _trace(resp, llm.name)
     return resp
 

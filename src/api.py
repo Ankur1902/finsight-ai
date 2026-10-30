@@ -18,6 +18,7 @@ from .chat import ChatAnswer, ChatRequest, answer_chat
 from .feedback import FeedbackError, FeedbackReceipt, FeedbackRequest, FeedbackStore
 from .errors import GenerationError
 from .http_boundary import BoundedJSONBody
+from .security import SecurityMiddleware
 
 @asynccontextmanager
 async def lifespan(app):
@@ -28,12 +29,17 @@ async def lifespan(app):
             from .llm import get_llm
             get_retriever()
             get_llm()
-        await asyncio.to_thread(warm)
+        try:
+            await asyncio.to_thread(warm)
+        except Exception as exc:
+            # A failed warm-up degrades first-request latency; it must not stop the API.
+            logging.getLogger(__name__).error("Warm-up failed: type=%s", type(exc).__name__)
     yield
 
 
 app = FastAPI(title="Finsight", version="2.2.0", lifespan=lifespan)
 app.add_middleware(BoundedJSONBody)
+app.add_middleware(SecurityMiddleware)
 log = logging.getLogger(__name__)
 
 
@@ -90,6 +96,26 @@ class CompareRequest(BaseModel):
     company: str = Field(pattern="^(meta|microsoft|nvda)$")
     before: str = Field(pattern=r"^Q[1-4]-20\d{2}$")
     after: str = Field(pattern=r"^Q[1-4]-20\d{2}$")
+
+
+@app.get("/guidance")
+def guidance(company: str = Query(pattern="^(meta|microsoft|nvda)$"), period: str = Query(pattern=r"^Q[1-4]-20\d{2}$")):
+    return run(lambda: service().guidance_vs_actual(company, period))
+
+
+@app.get("/observability/summary")
+def observability_summary():
+    from .observability import METRICS
+    from .answer_cache import ANSWERS
+    from .semantic_cache import SEMANTIC
+    return {**METRICS.summary(), "semantic_cache": {"hits": SEMANTIC.hits, "misses": SEMANTIC.misses}}
+
+
+@app.get("/observability/prometheus")
+def observability_prometheus():
+    from fastapi.responses import PlainTextResponse
+    from .observability import METRICS
+    return PlainTextResponse(METRICS.prometheus(), media_type="text/plain; version=0.0.4")
 
 
 @app.post("/changes")

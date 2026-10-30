@@ -1,0 +1,12 @@
+[
+ {"id":"g1","docs":["Total revenue was $65.6 billion, up 16%."],"answer":"Revenue was $65.6 billion, up 16% [1].","grounded":true},
+ {"id":"g2","docs":["Total revenue was $65.6 billion, up 16%."],"answer":"Revenue was $65,600 million [1].","grounded":false,"note":"unit conversion is not copied verbatim"},
+ {"id":"g3","docs":["Total revenue was $65.6 billion, up 16%."],"answer":"Revenue was $66.5 billion [1].","grounded":false},
+ {"id":"g4","docs":["Total revenue was $65.6 billion.","Capex was $19.0 billion."],"answer":"Revenue was $65.6 billion [2].","grounded":false,"note":"number cited to wrong passage"},
+ {"id":"g5","docs":["Diluted EPS was $3.30, an increase of 10%."],"answer":"Diluted EPS was $3.30, up 10% [1].","grounded":true},
+ {"id":"g6","docs":["Diluted EPS was $3.30, an increase of 10%."],"answer":"Diluted EPS was $3.30, up 10%.","grounded":false,"note":"uncited"},
+ {"id":"g7","docs":["Azure grew 33% and Microsoft Cloud revenue was $38.9 billion."],"answer":"Azure grew 33% [1] and Microsoft Cloud revenue was $38.9 billion [1].","grounded":true},
+ {"id":"g8","docs":["Azure grew 33% and Microsoft Cloud revenue was $38.9 billion."],"answer":"Azure grew 43% [1].","grounded":false},
+ {"id":"g9","docs":["Capital expenditures were $14.9 billion including finance leases."],"answer":"Capex was $14.9 billion [1].","grounded":true},
+ {"id":"g10","docs":["Capital expenditures were $14.9 billion including finance leases."],"answer":"Capex was $14.9 billion [3].","grounded":false,"note":"nonexistent citation"}
+]
