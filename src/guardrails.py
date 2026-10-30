@@ -17,6 +17,7 @@ and the UI / eval harness can surface exactly what fired.
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass, field
 from decimal import Decimal
 
@@ -114,8 +115,24 @@ def redact_pii(text: str) -> tuple[str, list[str]]:
     return text, sorted(set(found))
 
 
+# Zero-width, bidi and other invisible format characters used to split trigger
+# words ("ig\u200bnore") past regex filters.
+_INVISIBLE_RE = re.compile(r"[\u00ad\u034f\u061c\u115f\u1160\u17b4\u17b5\u180b-\u180e\u200b-\u200f"
+                           r"\u202a-\u202e\u2060-\u206f\u3164\ufe00-\ufe0f\ufeff\uffa0]")
+
+
+def normalize_text(text: str) -> str:
+    """Canonical form used for *detection only* (never shown back to the user):
+    NFKC folds full-width/compatibility lookalikes, invisible characters and
+    control characters are removed, whitespace is collapsed."""
+    text = unicodedata.normalize("NFKC", text or "")
+    text = _INVISIBLE_RE.sub("", text)
+    text = "".join(c if c in "\n\t" or unicodedata.category(c)[0] != "C" else " " for c in text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
 def is_injection(text: str) -> bool:
-    return bool(_INJECTION_RE.search(text))
+    return bool(_INJECTION_RE.search(text) or _INJECTION_RE.search(normalize_text(text)))
 
 
 def check_input(question: str) -> GuardrailResult:
@@ -139,7 +156,9 @@ def check_input(question: str) -> GuardrailResult:
             q,
         )
 
-    redacted, pii = redact_pii(q)
+    # Detection runs on the original *and* the normalised form so obfuscated
+    # PII (full-width digits, zero-width separators) is still redacted.
+    redacted, pii = redact_pii(normalize_text(q) if normalize_text(q) != q else q)
     flags = [f"pii_redacted:{kind}" for kind in pii]
 
     if UNCOVERED_COMPANIES.search(redacted) and not COVERED_HINT.search(redacted):
@@ -160,6 +179,13 @@ def check_input(question: str) -> GuardrailResult:
 # --------------------------------------------------------------------------- #
 # Retrieval
 # --------------------------------------------------------------------------- #
+
+
+def escape_untrusted(text: str) -> str:
+    """Neutralise markup that could close or forge the prompt's <source> /
+    <conversation_so_far> delimiters from inside retrieved or user text."""
+    return re.sub(r"<(/?)\s*(source|sources|conversation_so_far|system|assistant|instructions?)\b",
+                  lambda m: f"&lt;{m.group(1)}{m.group(2)}", text or "", flags=re.I)
 
 
 def filter_poisoned_chunks(docs: list[Document]) -> tuple[list[Document], int]:
@@ -196,7 +222,10 @@ _ADVICE_OUT_RE = re.compile(
     r"(strong|a)\s+(buy|sell)\s+(rating|signal)|good\s+time\s+to\s+(buy|sell))\b",
     re.I,
 )
-_LEAK_MARKERS = ("Rules you must follow", "You are Finsight")
+# Fixed canary embedded in the system prompt; if it ever shows up in an answer
+# the prompt has leaked (or the model was coerced into echoing it).
+PROMPT_CANARY = "FNS-7c1d9e42"
+_LEAK_MARKERS = ("Rules you must follow", "You are Finsight", PROMPT_CANARY)
 
 
 def extract_numbers(text: str) -> list[str]:
