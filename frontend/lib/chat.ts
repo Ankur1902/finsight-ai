@@ -85,6 +85,20 @@ export function parseChatAnswer(value: unknown): ChatAnswer {
   )
     return invalid();
   if (value.model !== undefined && !nullableText(value.model)) return invalid();
+  if (
+    value.claims !== undefined &&
+    (!Array.isArray(value.claims) ||
+      !value.claims.every(
+        (claim) =>
+          object(claim) &&
+          typeof claim.text === "string" &&
+          ["supported", "partial", "unsupported", "uncited"].includes(
+            String(claim.status),
+          ) &&
+          Array.isArray(claim.citations),
+      ))
+  )
+    return invalid();
   if (value.cached !== undefined && typeof value.cached !== "boolean")
     return invalid();
   const responseId = value.response_id,

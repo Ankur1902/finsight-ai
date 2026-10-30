@@ -52,6 +52,61 @@ export default function AnswerAssessment({ answer }: { answer: ChatAnswer }) {
             unclear explanations or incorrect comparisons.
           </dd>
         </div>
+        {!!answer.claims?.length && (
+          <div>
+            <dt>Claim check</dt>
+            <dd>
+              {answer.claim_summary && (
+                <p className="claim-summary">
+                  {answer.claim_summary.supported} of{" "}
+                  {answer.claim_summary.total} statements are supported by their
+                  cited passages
+                  {answer.claim_summary.unsupported
+                    ? `; ${answer.claim_summary.unsupported} could not be verified`
+                    : ""}
+                  . Automated lexical check, not a guarantee.
+                </p>
+              )}
+              <ul className="claim-list">
+                {answer.claims.map((claim, index) => (
+                  <li key={index} className={`claim claim-${claim.status}`}>
+                    <span className="claim-status">{claim.status}</span>{" "}
+                    {claim.text}
+                    {claim.ungrounded_numbers.length > 0 && (
+                      <em>
+                        {" "}
+                        · not in cited text:{" "}
+                        {claim.ungrounded_numbers.join(", ")}
+                      </em>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </dd>
+          </div>
+        )}
+        {!!answer.calculations?.length && (
+          <div>
+            <dt>Calculator</dt>
+            <dd>
+              Computed with exact decimal arithmetic from source figures:
+              <ul className="claim-list">
+                {answer.calculations.map((calc, index) => (
+                  <li key={index}>
+                    <code>{calc.text}</code> (sources{" "}
+                    {calc.sources.map((id) => `[${id}]`).join(", ")})
+                  </li>
+                ))}
+              </ul>
+            </dd>
+          </div>
+        )}
+        {answer.route && (
+          <div>
+            <dt>Model route</dt>
+            <dd>{answer.route}</dd>
+          </div>
+        )}
         {answer.model && (
           <div>
             <dt>Generator</dt>

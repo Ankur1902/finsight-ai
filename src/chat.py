@@ -23,6 +23,7 @@ class ChatRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     question: str = Field(min_length=1, max_length=MAX_QUESTION_CHARS)
     history: list[HistoryMessage] = Field(default_factory=list, max_length=12)
+    agentic: bool = False  # let a calculator tool compute derived figures
 
 
 class ChatSource(BaseModel):
@@ -64,6 +65,10 @@ class ChatAnswer(BaseModel):
     blocked: bool = False
     plan: ChatPlan | None = None
     timings_ms: dict[str, float] = Field(default_factory=dict)
+    claims: list[dict] = Field(default_factory=list)
+    claim_summary: dict | None = None
+    calculations: list[dict] = Field(default_factory=list)
+    route: str | None = None
 
 
 def answer_chat(request: ChatRequest, *, retriever_factory: Callable | None = None, rag_function: Callable | None = None, use_cache=True) -> ChatAnswer:
@@ -96,6 +101,8 @@ def answer_chat(request: ChatRequest, *, retriever_factory: Callable | None = No
                 if previous_input.allowed:
                     previous = plan_query(previous_input.text, retriever.catalog, previous)
         arguments = dict(history=history, previous_plan=previous, retriever=retriever)
+        if request.agentic:
+            arguments["tools"] = True
         if not use_cache:
             arguments["use_cache"] = False
         response = rag_function(request.question, **arguments)
@@ -129,4 +136,8 @@ def answer_chat(request: ChatRequest, *, retriever_factory: Callable | None = No
             for t in response.plan.targets
         ])
     return ChatAnswer(cached=bool(getattr(response, "details", {}).get("cached")), model=getattr(response, "details", {}).get("model"), question=response.question, answer=response.answer, sources=sources,
-                      flags=response.flags, blocked=response.blocked, plan=plan, timings_ms=response.timings_ms)
+                      flags=response.flags, blocked=response.blocked, plan=plan, timings_ms=response.timings_ms,
+                      claims=getattr(response, "details", {}).get("claims", []),
+                      claim_summary=getattr(response, "details", {}).get("claim_summary"),
+                      calculations=getattr(response, "details", {}).get("calculations", []),
+                      route=getattr(response, "details", {}).get("route"))

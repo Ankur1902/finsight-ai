@@ -1,5 +1,28 @@
 # 📈 Finsight: AI Financial Research Assistant
 
+[![ci](https://github.com/ankur1902/finsight-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/ankur1902/finsight-ai/actions/workflows/ci.yml)
+![red-team](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/ankur1902/finsight-ai/main/docs/badges/redteam.json)
+![groundedness](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/ankur1902/finsight-ai/main/docs/badges/groundedness.json)
+
+## What makes Finsight different
+
+| Capability | Where | Try it |
+|---|---|---|
+| **Red-team benchmark**: 49 attacks, attack-success-rate before vs after hardening, known gaps published | `src/eval/redteam.py`, [scoreboard](docs/redteam-scoreboard.md) | `make redteam` |
+| **Claim-level verification**: every sentence marked supported / partial / unsupported / uncited against its cited passages | `src/claims.py`, chat "Understand this response" | ask any question |
+| **Guidance-vs-actual tracker**: management's next-quarter guidance parsed with exact quotes, compared with the reported result | `src/guidance.py`, `GET /guidance`, sidebar "Guidance tracker" | `/guidance?company=meta&period=Q1-2025` |
+| **Observability**: per-stage p50/p95 latency, token and cost estimates, Prometheus text, optional OpenTelemetry | `src/observability.py`, `GET /observability/*` | sidebar "Observability" |
+| **Eval in CI**: retrieval, groundedness and red-team gates run offline on every push, with badges | `src/eval/ci_gate.py`, `.github/workflows/ci.yml` | `make gate` |
+| **Model router + semantic cache**: cheap model for lookups, strong model for comparisons, escalation on failure; paraphrase cache that cannot cross periods, numbers or direction | `src/router.py`, `src/semantic_cache.py` | `FINSIGHT_ROUTER=1 FINSIGHT_STRONG_MODEL=... FINSIGHT_SEMANTIC_CACHE=1` |
+| **Calculator tool (agentic mode)**: the model proposes arithmetic, Python Decimal computes it, and each operand must appear verbatim in the cited passage | `src/agent.py`, `src/calculator.py` | tick "Calculator mode" in chat, or `"agentic": true` |
+| **One-command demo** | `docker-compose.yml` | `docker compose up --build` |
+
+Honest limits: guidance parsing is rule-based and tuned on the Meta/NVIDIA phrasing (Microsoft rarely
+gives company-level numeric guidance, so it often returns nothing); claim checking is lexical plus
+numeric, not an entailment model (a `judge` hook is provided); the red-team suite documents attacks
+that still get through (non-English, base64, letter-spaced injections); cost figures are estimates.
+See [demo script](docs/demo-script.md) for a 2-minute walkthrough.
+
 ## Overview
 
 For the current uncommitted implementation, see [engineering challenges and decisions](docs/engineering-decisions.md) and [the change inventory and validation plan](docs/uncommitted-review.md). The October 11 hardening changes were written without running the project or tests.

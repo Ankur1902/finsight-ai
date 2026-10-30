@@ -17,6 +17,7 @@ and the UI / eval harness can surface exactly what fired.
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass, field
 from decimal import Decimal
 
@@ -52,6 +53,7 @@ INJECTION_PATTERNS = [
     r"ignore\s+(all\s+|any\s+|the\s+)?(previous|prior|above|earlier|preceding)\s+(instructions|prompts?|rules|context)",
     r"disregard\s+(all\s+|the\s+|your\s+)?(previous|prior|above|system|instructions|rules)",
     r"forget\s+(everything|all|your)\s+(instructions|rules|above|previous)",
+    r"forget\s+(everything|all)\b(\s+(you|that|i|we)\b)?",
     r"(reveal|show|print|repeat|leak|output)\s+(me\s+)?(your|the)\s+(system\s+)?(prompt|instructions)",
     r"\bsystem\s+prompt\b",
     r"you\s+are\s+now\s+(a|an|in)\b",
@@ -114,8 +116,24 @@ def redact_pii(text: str) -> tuple[str, list[str]]:
     return text, sorted(set(found))
 
 
+# Zero-width, bidi and other invisible format characters used to split trigger
+# words ("ig\u200bnore") past regex filters.
+_INVISIBLE_RE = re.compile(r"[\u00ad\u034f\u061c\u115f\u1160\u17b4\u17b5\u180b-\u180e\u200b-\u200f"
+                           r"\u202a-\u202e\u2060-\u206f\u3164\ufe00-\ufe0f\ufeff\uffa0]")
+
+
+def normalize_text(text: str) -> str:
+    """Canonical form used for *detection only* (never shown back to the user):
+    NFKC folds full-width/compatibility lookalikes, invisible characters and
+    control characters are removed, whitespace is collapsed."""
+    text = unicodedata.normalize("NFKC", text or "")
+    text = _INVISIBLE_RE.sub("", text)
+    text = "".join(c if c in "\n\t" or unicodedata.category(c)[0] != "C" else " " for c in text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
 def is_injection(text: str) -> bool:
-    return bool(_INJECTION_RE.search(text))
+    return bool(_INJECTION_RE.search(text) or _INJECTION_RE.search(normalize_text(text)))
 
 
 def check_input(question: str) -> GuardrailResult:
@@ -139,7 +157,9 @@ def check_input(question: str) -> GuardrailResult:
             q,
         )
 
-    redacted, pii = redact_pii(q)
+    # Detection runs on the original *and* the normalised form so obfuscated
+    # PII (full-width digits, zero-width separators) is still redacted.
+    redacted, pii = redact_pii(normalize_text(q) if normalize_text(q) != q else q)
     flags = [f"pii_redacted:{kind}" for kind in pii]
 
     if UNCOVERED_COMPANIES.search(redacted) and not COVERED_HINT.search(redacted):
@@ -160,6 +180,13 @@ def check_input(question: str) -> GuardrailResult:
 # --------------------------------------------------------------------------- #
 # Retrieval
 # --------------------------------------------------------------------------- #
+
+
+def escape_untrusted(text: str) -> str:
+    """Neutralise markup that could close or forge the prompt's <source> /
+    <conversation_so_far> delimiters from inside retrieved or user text."""
+    return re.sub(r"<(/?)\s*(source|sources|conversation_so_far|system|assistant|instructions?)\b",
+                  lambda m: f"&lt;{m.group(1)}{m.group(2)}", text or "", flags=re.I)
 
 
 def filter_poisoned_chunks(docs: list[Document]) -> tuple[list[Document], int]:
@@ -196,7 +223,10 @@ _ADVICE_OUT_RE = re.compile(
     r"(strong|a)\s+(buy|sell)\s+(rating|signal)|good\s+time\s+to\s+(buy|sell))\b",
     re.I,
 )
-_LEAK_MARKERS = ("Rules you must follow", "You are Finsight")
+# Fixed canary embedded in the system prompt; if it ever shows up in an answer
+# the prompt has leaked (or the model was coerced into echoing it).
+PROMPT_CANARY = "FNS-7c1d9e42"
+_LEAK_MARKERS = ("Rules you must follow", "You are Finsight", PROMPT_CANARY)
 
 
 def extract_numbers(text: str) -> list[str]:
@@ -230,7 +260,8 @@ def cited_indices(answer: str) -> list[int]:
     return [int(n) for group in _CITATION_RE.findall(answer) for n in re.split(r"\s*,\s*", group)]
 
 
-def check_output(answer: str, docs: list[Document], advice_requested: bool = False) -> GuardrailResult:
+def check_output(answer: str, docs: list[Document], advice_requested: bool = False,
+                 extra_numbers: set[Decimal] | None = None) -> GuardrailResult:
     flags: list[str] = []
     text = answer.strip()
     details: dict = {}
@@ -265,7 +296,7 @@ def check_output(answer: str, docs: list[Document], advice_requested: bool = Fal
     # Numeric grounding ---------------------------------------------------
     # A number appearing in an unrelated retrieved passage is not citation support.
     cited_docs = [docs[i - 1] for i in sorted(set(cites)) if 1 <= i <= len(docs)]
-    context_numbers = _context_numbers("\n".join(d.page_content for d in cited_docs))
+    context_numbers = _context_numbers("\n".join(d.page_content for d in cited_docs)) | (extra_numbers or set())
     numbers = extract_numbers(text)
     ungrounded = [n for n in numbers if not _number_in_context(n, context_numbers)]
     details["numbers_total"] = len(numbers)

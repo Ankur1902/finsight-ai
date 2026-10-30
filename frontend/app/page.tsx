@@ -4,10 +4,12 @@ import { useState } from "react";
 import ResearchChat from "./components/research-chat";
 import FinancialDashboard from "./components/financial-dashboard";
 import QuarterlyAnalyst from "./components/quarterly-analyst";
+import GuidanceTracker from "./components/guidance-tracker";
+import OpsDashboard from "./components/ops-dashboard";
 import { useAnalyticsWorkspace } from "./hooks/use-analytics-workspace";
 import { periodLabel } from "../lib/finance";
 
-type View = "chat" | "metrics" | "changes";
+type View = "chat" | "metrics" | "changes" | "guidance" | "ops";
 const VIEWS: Record<View, { title: string; description: string; nav: string }> =
   {
     chat: {
@@ -27,6 +29,18 @@ const VIEWS: Record<View, { title: string; description: string; nav: string }> =
       description:
         "Compare financial results and understand changes in management commentary.",
       nav: "⇄ Quarterly changes",
+    },
+    guidance: {
+      title: "Guidance vs. Actual Tracker",
+      description:
+        "What management guided for next quarter, and what it then reported, with exact quotations.",
+      nav: "◎ Guidance tracker",
+    },
+    ops: {
+      title: "Pipeline Observability",
+      description:
+        "Stage latency, estimated cost per route and cache effectiveness.",
+      nav: "▤ Observability",
     },
   };
 const COMPANIES = [
@@ -88,7 +102,7 @@ export default function Home() {
           </div>
           <span className="badge">TRANSCRIPT RESEARCH</span>
         </header>
-        {view !== "chat" && (
+        {(view === "metrics" || view === "changes") && (
           <>
             {workspace.catalogError && (
               <div role="alert" className="error">
@@ -214,6 +228,8 @@ export default function Home() {
           catalogError={workspace.catalogError}
           onRetryCatalog={workspace.reloadCatalog}
         />
+        {view === "guidance" && <GuidanceTracker catalog={workspace.catalog} />}
+        {view === "ops" && <OpsDashboard />}
         {view === "metrics" && (
           <FinancialDashboard
             metrics={workspace.metrics}
