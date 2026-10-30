@@ -127,7 +127,13 @@ async function proxy(
     const upstream = await fetch(url, {
       dispatcher: backendAgent,
       method: request.method,
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        // Shared secret and original client address for backend auth/rate limits.
+        ...(process.env.FINSIGHT_API_KEY ? { "X-API-Key": process.env.FINSIGHT_API_KEY } : {}),
+        ...(request.headers.get("x-forwarded-for")
+          ? { "X-Forwarded-For": request.headers.get("x-forwarded-for")! } : {}),
+      },
       body: body === undefined ? undefined : Buffer.from(body),
       cache: "no-store",
       signal,

@@ -19,7 +19,7 @@ from .config import (
     GEMINI_THINKING_LEVEL,
     PROVIDER_TIMEOUT_MS,
 )
-from .errors import GenerationError, provider_error
+from .errors import GenerationError, provider_error, with_retries
 
 
 class LLM(Protocol):
@@ -50,14 +50,20 @@ class LocalLLM:
             {"role": "system", "content": system},
             {"role": "user", "content": user},
         ]
-        out = self._pipe(
-            messages,
-            max_new_tokens=max_tokens or MAX_NEW_TOKENS,
-            do_sample=False,  # deterministic; factual QA gains nothing from sampling
-            repetition_penalty=1.05,
-            return_full_text=False,
-        )
-        return out[0]["generated_text"].strip()
+        try:
+            out = self._pipe(
+                messages,
+                max_new_tokens=max_tokens or MAX_NEW_TOKENS,
+                do_sample=False,  # deterministic; factual QA gains nothing from sampling
+                repetition_penalty=1.05,
+                return_full_text=False,
+            )
+            text = out[0]["generated_text"].strip()
+        except Exception:
+            raise GenerationError("The local model could not complete the request.") from None
+        if not text:
+            raise GenerationError("The local model returned no answer")
+        return text
 
 
 class AnthropicLLM:
@@ -70,6 +76,9 @@ class AnthropicLLM:
         self._client = anthropic.Anthropic(timeout=PROVIDER_TIMEOUT_MS / 1000, max_retries=0)
 
     def generate(self, system: str, user: str, max_tokens: int | None = None) -> str:
+        return with_retries(lambda: self._generate_once(system, user, max_tokens))
+
+    def _generate_once(self, system: str, user: str, max_tokens: int | None) -> str:
         try:
             response = self._client.messages.create(
                 model=self._model,
@@ -165,7 +174,7 @@ class GeminiLLM:
         return text.strip()
 
     def generate(self, system, user, max_tokens=None):
-        return self._generate(system, user, max_tokens or MAX_NEW_TOKENS)
+        return with_retries(lambda: self._generate(system, user, max_tokens or MAX_NEW_TOKENS))
 
     def generate_json(self, system, user, schema, max_tokens=4096):
-        return self._generate(system, user, max_tokens, schema)
+        return with_retries(lambda: self._generate(system, user, max_tokens, schema))

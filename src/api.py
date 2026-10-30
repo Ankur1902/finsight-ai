@@ -18,6 +18,7 @@ from .chat import ChatAnswer, ChatRequest, answer_chat
 from .feedback import FeedbackError, FeedbackReceipt, FeedbackRequest, FeedbackStore
 from .errors import GenerationError
 from .http_boundary import BoundedJSONBody
+from .security import SecurityMiddleware
 
 @asynccontextmanager
 async def lifespan(app):
@@ -28,12 +29,17 @@ async def lifespan(app):
             from .llm import get_llm
             get_retriever()
             get_llm()
-        await asyncio.to_thread(warm)
+        try:
+            await asyncio.to_thread(warm)
+        except Exception as exc:
+            # A failed warm-up degrades first-request latency; it must not stop the API.
+            logging.getLogger(__name__).error("Warm-up failed: type=%s", type(exc).__name__)
     yield
 
 
 app = FastAPI(title="Finsight", version="2.2.0", lifespan=lifespan)
 app.add_middleware(BoundedJSONBody)
+app.add_middleware(SecurityMiddleware)
 log = logging.getLogger(__name__)
 
 
