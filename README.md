@@ -4,6 +4,16 @@
 ![red-team](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/ankur1902/finsight-ai/main/docs/badges/redteam.json)
 ![groundedness](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/ankur1902/finsight-ai/main/docs/badges/groundedness.json)
 
+## Demo
+
+[**Watch the 85-second walkthrough**](docs/demo/finsight-demo.mp4) · cited answers, claim-level checks, calculator mode, prompt-injection defence, red-team scoreboard, guidance tracker, observability.
+
+![Claim-level check and calculator](docs/demo/03-calculator.png)
+
+The video was recorded keyless with `demo/demo_server.py`: real retrieval over the PDFs, guardrails, claim checks,
+calculator and tracker, but an **extractive stand-in instead of an LLM** (labelled in the video). Reproduce it with
+`demo/start_api.sh & demo/start_web.sh &` then `node demo/record.js`.
+
 ## What makes Finsight different
 
 | Capability | Where | Try it |

@@ -41,3 +41,20 @@ def test_judge_resolves_partial():
     answer = "Demand momentum for new accelerators appeared broad among cloud buyers [1]."
     assert verify_claims(answer, docs)[0].status in {"partial", "unsupported"}
     assert verify_claims(answer, docs, judge=lambda c, e: True)[0].status in {"supported", "unsupported"}
+
+
+def test_citation_after_period_stays_with_its_sentence():
+    docs = [D("Q1 total revenue was $42.3 billion, up 16% on a reported basis.")]
+    claims = verify_claims("Q1 total revenue was $42.3 billion, up 16% on a reported basis. [1]", docs)
+    assert [c.status for c in claims] == ["supported"] and claims[0].citations == [1]
+    two = verify_claims("Revenue was $42.3 billion. [1] Growth was 16%. [1]", docs)
+    assert [c.citations for c in two] == [[1], [1]]
+
+
+def test_calculator_result_claim_is_supported():
+    docs = [D("Q1 total revenue was $42.3 billion."), D("Q2 total revenue was $47.5 billion.")]
+    answer = "Revenue grew 12.29% between the two quarters (computed exactly by the calculator tool) [1, 2]."
+    assert verify_claims(answer, docs)[0].status == "unsupported"
+    assert verify_claims(answer, docs, extra_numbers={Decimal("12.29")})[0].status == "supported"
+    wrong = verify_claims(answer.replace("12.29", "15.00"), docs, extra_numbers={Decimal("12.29")})
+    assert wrong[0].status == "unsupported"

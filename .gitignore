@@ -18,3 +18,4 @@ feedback.sqlite3*
 feedback-report*.json
 
 .e2e/
+demo/out/
