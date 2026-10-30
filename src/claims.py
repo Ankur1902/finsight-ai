@@ -14,7 +14,9 @@ from .guardrails import _CITATION_RE, _context_numbers, extract_numbers, cited_i
 
 _STOP = set("""a an and are as at be been but by for from had has have in into is it its of on or that the their
 they this to was were which with we our up out new also about over more than not will would can could""".split())
-_SENT = re.compile(r"(?<=[.!?])\s+(?=[A-Z$\[\d])|\n+")
+# Split after sentence-ending punctuation or after a trailing citation, but never between
+# a period and its citation ("... basis. [1]").
+_SENT = re.compile(r"(?<=[.!?])\s+(?=[A-Z$\d])|(?<=\])\s+(?=[A-Z$])|\n+")
 
 
 @dataclass
@@ -55,8 +57,11 @@ def verify_claims(answer: str, docs: list[Document], judge: Callable[[str, str],
         terms = _terms(text)
         ev_terms = _terms(evidence)
         support = len(terms & ev_terms) / len(terms) if terms else 1.0
+        computed = bool(extra_numbers) and any(Decimal(n).normalize() in extra_numbers for n in extract_numbers(text))
         if bad:
             status = "unsupported"
+        elif computed:
+            status = "supported"  # figures were computed by the calculator from the cited operands
         elif support >= 0.6:
             status = "supported"
         elif support >= 0.35:
