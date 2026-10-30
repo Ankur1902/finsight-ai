@@ -107,9 +107,24 @@ def _resolve_provider() -> str:
     return "anthropic" if os.getenv("ANTHROPIC_API_KEY") else "local"
 
 
+def _build(provider: str, model: str | None = None) -> LLM:
+    if provider == "anthropic":
+        return AnthropicLLM(model) if model else AnthropicLLM()
+    if provider == "local":
+        return LocalLLM(model) if model else LocalLLM()
+    if provider == "gemini":
+        return GeminiLLM(model) if model else GeminiLLM()
+    raise ValueError(f"Unknown FINSIGHT_LLM_PROVIDER: {provider!r}")
+
+
 @lru_cache(maxsize=1)
 def get_llm() -> LLM:
     provider = _resolve_provider()
+    strong_model = os.getenv("FINSIGHT_STRONG_MODEL")
+    if os.getenv("FINSIGHT_ROUTER") == "1" and strong_model:
+        from .router import RoutedLLM
+        strong_provider = os.getenv("FINSIGHT_STRONG_PROVIDER", provider)
+        return RoutedLLM(_build(provider), _build(strong_provider, strong_model))
     if provider == "anthropic":
         return AnthropicLLM()
     if provider == "local":

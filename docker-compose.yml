@@ -1,0 +1,25 @@
+# One command: `docker compose up --build`  ->  http://localhost:3000
+# Put GEMINI_API_KEY (or ANTHROPIC_API_KEY) in .env first. Without a key the
+# backend would need the heavy local-model dependencies, which this image omits.
+services:
+  api:
+    build: .
+    env_file: [.env]
+    environment:
+      FINSIGHT_API_KEY: ${FINSIGHT_API_KEY:-demo-internal-key}
+      FINSIGHT_TRUST_PROXY: "1"
+      FINSIGHT_ROUTER: ${FINSIGHT_ROUTER:-0}
+      FINSIGHT_STRONG_MODEL: ${FINSIGHT_STRONG_MODEL:-}
+      FINSIGHT_SEMANTIC_CACHE: ${FINSIGHT_SEMANTIC_CACHE:-1}
+    volumes:
+      - finsight-state:/app/state
+    expose: ["8000"]
+  web:
+    build: ./frontend
+    depends_on: [api]
+    environment:
+      FINSIGHT_API_URL: http://api:8000
+      FINSIGHT_API_KEY: ${FINSIGHT_API_KEY:-demo-internal-key}
+    ports: ["3000:3000"]
+volumes:
+  finsight-state:

@@ -377,6 +377,22 @@ class AnalyticsService:
 
         return self._cached(f"metrics:{company}:{period}", pages, build)
 
+    def guidance_vs_actual(self, company, period):
+        """What management guided for the *next* quarter vs what it then reported."""
+        from .guidance import compare, extract_guidance, next_period
+        pages = self._period_pages(company, period)
+        periods = [p["period"] for p in self.catalog() if p["company"] == company]
+        following = next_period(periods, period)
+        guidance = extract_guidance(pages)
+        result = {"company": company, "guided_in": period, "reported_in": following,
+                  "guidance": [], "notice": "Guidance is extracted deterministically with exact quotations; actuals "
+                  "are validated AI extractions for the following reported quarter. No values are interpolated."}
+        if not guidance:
+            return {**result, "notice": result["notice"] + " No numeric guidance was found on these pages."}
+        facts = self.metrics(company, following)["facts"] if following else []
+        result["guidance"] = compare(guidance, facts)
+        return result
+
     def changes(self, company, before, after):
         old, new = self._period_pages(company, before), self._period_pages(company, after)
         if (old[0].metadata["year"], old[0].metadata["quarter"]) >= (new[0].metadata["year"], new[0].metadata["quarter"]):

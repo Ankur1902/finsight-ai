@@ -53,6 +53,7 @@ INJECTION_PATTERNS = [
     r"ignore\s+(all\s+|any\s+|the\s+)?(previous|prior|above|earlier|preceding)\s+(instructions|prompts?|rules|context)",
     r"disregard\s+(all\s+|the\s+|your\s+)?(previous|prior|above|system|instructions|rules)",
     r"forget\s+(everything|all|your)\s+(instructions|rules|above|previous)",
+    r"forget\s+(everything|all)\b(\s+(you|that|i|we)\b)?",
     r"(reveal|show|print|repeat|leak|output)\s+(me\s+)?(your|the)\s+(system\s+)?(prompt|instructions)",
     r"\bsystem\s+prompt\b",
     r"you\s+are\s+now\s+(a|an|in)\b",
@@ -259,7 +260,8 @@ def cited_indices(answer: str) -> list[int]:
     return [int(n) for group in _CITATION_RE.findall(answer) for n in re.split(r"\s*,\s*", group)]
 
 
-def check_output(answer: str, docs: list[Document], advice_requested: bool = False) -> GuardrailResult:
+def check_output(answer: str, docs: list[Document], advice_requested: bool = False,
+                 extra_numbers: set[Decimal] | None = None) -> GuardrailResult:
     flags: list[str] = []
     text = answer.strip()
     details: dict = {}
@@ -294,7 +296,7 @@ def check_output(answer: str, docs: list[Document], advice_requested: bool = Fal
     # Numeric grounding ---------------------------------------------------
     # A number appearing in an unrelated retrieved passage is not citation support.
     cited_docs = [docs[i - 1] for i in sorted(set(cites)) if 1 <= i <= len(docs)]
-    context_numbers = _context_numbers("\n".join(d.page_content for d in cited_docs))
+    context_numbers = _context_numbers("\n".join(d.page_content for d in cited_docs)) | (extra_numbers or set())
     numbers = extract_numbers(text)
     ungrounded = [n for n in numbers if not _number_in_context(n, context_numbers)]
     details["numbers_total"] = len(numbers)

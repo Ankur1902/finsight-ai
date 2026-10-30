@@ -1259,3 +1259,85 @@ footer {
   font-size: 11px;
   color: #47668e;
 }
+
+/* Claim check, calculator mode, guidance tracker, observability */
+.claim-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.claim {
+  padding: 6px 8px;
+  border-left: 3px solid var(--border);
+  border-radius: 4px;
+  background: #fff;
+}
+.claim-supported {
+  border-left-color: #2e8b57;
+}
+.claim-partial {
+  border-left-color: #d9a400;
+}
+.claim-unsupported,
+.claim-uncited {
+  border-left-color: #c0392b;
+}
+.claim-status {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.agentic-toggle {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  margin: 6px 0;
+}
+.guidance-tracker .controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: end;
+  margin-bottom: 14px;
+}
+.guidance-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin: 10px 0;
+  background: #fff;
+}
+.guidance-card header {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.guidance-card blockquote {
+  margin: 8px 0 0;
+  padding-left: 10px;
+  border-left: 3px solid var(--border);
+  font-size: 12px;
+  color: var(--muted);
+}
+.verdict {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #eef2f8;
+}
+.verdict-beat .verdict {
+  background: #dff3e7;
+  color: #1d6b43;
+}
+.verdict-miss .verdict {
+  background: #fbe3df;
+  color: #9b2c20;
+}
+.ops-dashboard h2 {
+  font-size: 15px;
+  margin: 18px 0 8px;
+}

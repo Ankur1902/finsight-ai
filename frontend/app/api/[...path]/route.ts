@@ -12,6 +12,8 @@ const ROUTES: Readonly<
   chat: { method: "POST", segments: 1 },
   feedback: { method: "POST", segments: 1 },
   documents: { method: "GET", segments: 2 },
+  guidance: { method: "GET", segments: 1 },
+  observability: { method: "GET", segments: 2 },
 };
 const MAX_BODY_BYTES = 256 * 1024;
 const backendAgent = new Agent({
@@ -75,7 +77,8 @@ async function proxy(
   if (
     path[0] === "documents" &&
     (!/^[^/\\\u0000-\u001f]+\.pdf$/i.test(path[1]) ||
-      path[1] === "." || path[1] === "..")
+      path[1] === "." ||
+      path[1] === "..")
   )
     return Response.json({ detail: "Document not found" }, { status: 404 });
   const deadline = AbortSignal.timeout(
@@ -114,10 +117,14 @@ async function proxy(
     const configured = new URL(base);
     if (
       !["http:", "https:"].includes(configured.protocol) ||
-      configured.username || configured.password || configured.search || configured.hash
+      configured.username ||
+      configured.password ||
+      configured.search ||
+      configured.hash
     )
       return Response.json(
-        { detail: "The research service URL is misconfigured." }, { status: 503 },
+        { detail: "The research service URL is misconfigured." },
+        { status: 503 },
       );
     const url = new URL(
       path.map(encodeURIComponent).join("/"),
@@ -130,9 +137,12 @@ async function proxy(
       headers: {
         "Content-Type": "application/json",
         // Shared secret and original client address for backend auth/rate limits.
-        ...(process.env.FINSIGHT_API_KEY ? { "X-API-Key": process.env.FINSIGHT_API_KEY } : {}),
+        ...(process.env.FINSIGHT_API_KEY
+          ? { "X-API-Key": process.env.FINSIGHT_API_KEY }
+          : {}),
         ...(request.headers.get("x-forwarded-for")
-          ? { "X-Forwarded-For": request.headers.get("x-forwarded-for")! } : {}),
+          ? { "X-Forwarded-For": request.headers.get("x-forwarded-for")! }
+          : {}),
       },
       body: body === undefined ? undefined : Buffer.from(body),
       cache: "no-store",
@@ -146,7 +156,8 @@ async function proxy(
         "Cache-Control": "no-store",
         "X-Content-Type-Options": "nosniff",
         ...(upstream.headers.get("Retry-After")
-          ? { "Retry-After": upstream.headers.get("Retry-After")! } : {}),
+          ? { "Retry-After": upstream.headers.get("Retry-After")! }
+          : {}),
       },
     });
   } catch {

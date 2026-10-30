@@ -98,6 +98,26 @@ class CompareRequest(BaseModel):
     after: str = Field(pattern=r"^Q[1-4]-20\d{2}$")
 
 
+@app.get("/guidance")
+def guidance(company: str = Query(pattern="^(meta|microsoft|nvda)$"), period: str = Query(pattern=r"^Q[1-4]-20\d{2}$")):
+    return run(lambda: service().guidance_vs_actual(company, period))
+
+
+@app.get("/observability/summary")
+def observability_summary():
+    from .observability import METRICS
+    from .answer_cache import ANSWERS
+    from .semantic_cache import SEMANTIC
+    return {**METRICS.summary(), "semantic_cache": {"hits": SEMANTIC.hits, "misses": SEMANTIC.misses}}
+
+
+@app.get("/observability/prometheus")
+def observability_prometheus():
+    from fastapi.responses import PlainTextResponse
+    from .observability import METRICS
+    return PlainTextResponse(METRICS.prometheus(), media_type="text/plain; version=0.0.4")
+
+
 @app.post("/changes")
 def changes(body: CompareRequest):
     return run(lambda: service().changes(body.company, body.before, body.after))
