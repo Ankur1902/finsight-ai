@@ -1344,3 +1344,4 @@ footer {
 
 .guidance-tracker .controls label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; }
 .guidance-tracker .controls select { font-size: 14px; padding: 6px 8px; }
+.ops-dashboard table { width: 100%; max-width: 980px; }

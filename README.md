@@ -6,13 +6,13 @@
 
 ## Demo
 
-[**Watch the 85-second walkthrough**](docs/demo/finsight-demo.mp4) · cited answers, claim-level checks, calculator mode, prompt-injection defence, red-team scoreboard, guidance tracker, observability.
+[**Watch the ~2-minute walkthrough**](docs/demo/finsight-demo.mp4) · cited answers, claim-level checks, calculator mode, prompt-injection defence, red-team scoreboard, guidance tracker, observability.
 
-![Claim-level check and calculator](docs/demo/03-calculator.png)
+![Claim check and calculator](docs/demo/03-calculator.png)
 
-The video was recorded keyless with `demo/demo_server.py`: real retrieval over the PDFs, guardrails, claim checks,
-calculator and tracker, but an **extractive stand-in instead of an LLM** (labelled in the video). Reproduce it with
-`demo/start_api.sh & demo/start_web.sh &` then `node demo/record.js`.
+The walkthrough was recorded with `demo/record.js` (automatic camera zoom, cursor and captions). Answer text in the recording comes
+from a deterministic demo responder (`demo/demo_server.py`); retrieval over the PDFs, guardrails, claim verification, the calculator and the
+guidance tracker run on the real code paths. Re-record with `demo/start_api.sh & demo/start_web.sh &`, then `node demo/record.js && node demo/encode.js`.
 
 ## What makes Finsight different
 

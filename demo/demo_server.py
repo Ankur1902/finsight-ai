@@ -50,7 +50,7 @@ def _revenue(text):
 
 
 class DemoModel(FixtureModel):
-    name = "demo-extractive:no-api-key"
+    name = "finsight-demo:responder"
 
     def generate(self, system, user, max_tokens=None):
         if user.lstrip().startswith("{") and "<sources>" not in user:
